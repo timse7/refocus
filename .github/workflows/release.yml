@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME is not of the form v1.2.3 or v1.2.3-beta.1"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Tags with a suffix such as -beta.1 become pre-releases.
+          [[ "$VERSION" == *-* ]] && echo "prerelease=--prerelease" >> "$GITHUB_OUTPUT" || true
+
+      - name: Stamp version into Info.plist
+        run: |
+          # The short version is what users see; the build number must be numeric and increase.
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Resources/Info.plist
+
+      - name: Build Refocus.app
+        run: ./build-app.sh
+
+      - name: Package
+        id: package
+        run: |
+          ZIP="Refocus-${{ steps.version.outputs.version }}.zip"
+          ditto -c -k --keepParent build/Refocus.app "build/$ZIP"
+          (cd build && shasum -a 256 "$ZIP" > "$ZIP.sha256")
+          echo "zip=build/$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'EOF'
+          > **First launch:** this build is ad-hoc signed, not notarized, so macOS blocks it the first time.
+          > Allow it under System Settings → Privacy & Security → **Open Anyway**, or run
+          > `xattr -dr com.apple.quarantine /Applications/Refocus.app`.
+          >
+          > Requires macOS 14 or later on Apple silicon. Quit Hocus Focus before using Refocus.
+          EOF
+          gh release create "$GITHUB_REF_NAME" \
+            "${{ steps.package.outputs.zip }}" "${{ steps.package.outputs.zip }}.sha256" \
+            --verify-tag --generate-notes --notes-file notes.md ${{ steps.version.outputs.prerelease }}
