@@ -1,3 +1,5 @@
 .build/
 build/
 .swiftpm/
+# Artifacts downloaded with `gh run download`
+Refocus-*/
