@@ -1,6 +1,6 @@
 # Refocus
 
-A native Apple silicon re-implementation of [Hocus Focus](https://hocusfoc.us/) (UglyApps, last release 1.3 from 2015, Intel only).
+A native Apple silicon re-implementation of [Hocus Focus](https://hocusfoc.us/) (last version 1.3, Intel only).
 
 ## What Hocus Focus does (and what Refocus reproduces)
 
@@ -32,4 +32,4 @@ Requires Xcode 16+ and macOS 14+. Quit Hocus Focus first so the two don't compet
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Refocus is an independent project and is not affiliated with UglyApps or Hocus Focus.
+MIT, see [LICENSE](LICENSE). Refocus is an independent project and is not affiliated with the developers of Hocus Focus.
