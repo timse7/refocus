@@ -29,3 +29,7 @@ open build/Refocus.app
 The app icon is drawn in code (`Icon/make-icon.swift`). After editing it, run `Icon/build-icns.sh` to regenerate `Resources/AppIcon.icns`.
 
 Requires Xcode 16+ and macOS 14+. Quit Hocus Focus first so the two don't compete.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Refocus is an independent project and is not affiliated with UglyApps or Hocus Focus.
