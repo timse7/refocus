@@ -12,6 +12,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags, for the commit list
 
       - name: Read version from tag
         id: version
@@ -53,6 +55,16 @@ jobs:
           >
           > Requires macOS 14 or later on Apple silicon. Quit Hocus Focus before using Refocus.
           EOF
+          # Commits since the previous version tag (all commits for the first release).
+          PREV=$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          RANGE="${PREV:+$PREV..}$GITHUB_REF_NAME"
+          {
+            echo
+            echo "## Changes${PREV:+ since $PREV}"
+            echo
+            git log --no-merges --reverse \
+              --format="- %s ([\`%h\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/%H))" "$RANGE"
+          } >> notes.md
           gh release create "$GITHUB_REF_NAME" \
             "${{ steps.package.outputs.zip }}" "${{ steps.package.outputs.zip }}.sha256" \
             --verify-tag --generate-notes --notes-file notes.md ${{ steps.version.outputs.prerelease }}
