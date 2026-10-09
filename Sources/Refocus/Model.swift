@@ -45,10 +45,28 @@ struct Config: Codable {
     var hidingPaused = false
     var totalHidden = 0
     var cycleProfilesHotKey: HotKeyCombo?
+    /// Freeze countdowns while the screen is locked, the Mac sleeps or the user is idle.
+    var pauseWhileAway = true
+    /// Seconds without keyboard/mouse input that count as away; 0 = only lock/sleep/screensaver.
+    var idleThreshold = 120
 
     static func fresh() -> Config {
         let p = Profile(name: "Default", defaultTimeout: 120)
         return Config(profiles: [p], activeProfileID: p.id)
+    }
+}
+
+extension Config {
+    // Tolerates config files written by older versions that lack newer keys.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        profiles = try c.decode([Profile].self, forKey: .profiles)
+        activeProfileID = try c.decode(UUID.self, forKey: .activeProfileID)
+        hidingPaused = try c.decodeIfPresent(Bool.self, forKey: .hidingPaused) ?? false
+        totalHidden = try c.decodeIfPresent(Int.self, forKey: .totalHidden) ?? 0
+        cycleProfilesHotKey = try c.decodeIfPresent(HotKeyCombo.self, forKey: .cycleProfilesHotKey)
+        pauseWhileAway = try c.decodeIfPresent(Bool.self, forKey: .pauseWhileAway) ?? true
+        idleThreshold = try c.decodeIfPresent(Int.self, forKey: .idleThreshold) ?? 120
     }
 }
 

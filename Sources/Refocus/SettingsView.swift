@@ -32,6 +32,20 @@ private struct GeneralSettings: View {
                 }
             Toggle("Hide applications", isOn: Binding(get: { !store.config.hidingPaused },
                                                       set: { store.config.hidingPaused = !$0 }))
+            Toggle(isOn: $store.config.pauseWhileAway) {
+                Text("Pause countdowns while away")
+                Text("While the screen is locked, the Mac or its displays sleep, or the screensaver runs.")
+            }
+            Picker(selection: $store.config.idleThreshold) {
+                Text("Never").tag(0)
+                ForEach([1, 2, 3, 5, 10, 15, 30], id: \.self) { m in
+                    Text("After \(m) min").tag(m * 60)
+                }
+            } label: {
+                Text("Also pause when idle")
+                Text("No keyboard or mouse input for this long counts as away.")
+            }
+            .disabled(!store.config.pauseWhileAway)
             LabeledContent("Cycle profiles hotkey") {
                 ShortcutRecorder(combo: $store.config.cycleProfilesHotKey)
             }

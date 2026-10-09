@@ -37,6 +37,13 @@ final class HidingEngine: ObservableObject {
     private var observers: [NSObjectProtocol] = []
     private var timer: Timer?
 
+    private var screenLocked = false
+    private var screenSaverRunning = false
+    private var systemAsleep = false
+    private var displaysAsleep = false
+    /// Set while countdowns are frozen; the time they froze at.
+    @Published private(set) var awaySince: Date?
+
     private init(store: Store) {
         self.store = store
         let now = Date()
@@ -60,6 +67,25 @@ final class HidingEngine: ObservableObject {
         observe(NSWorkspace.didHideApplicationNotification) { _, _ in }
         observe(NSWorkspace.didTerminateApplicationNotification) { $0.lastActive[$1.processIdentifier] = nil }
 
+        func flag(_ center: NotificationCenter, _ name: String, _ set: @escaping @MainActor (HidingEngine) -> Void) {
+            observers.append(center.addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    set(self)
+                    self.tick()
+                }
+            })
+        }
+        let dnc = DistributedNotificationCenter.default()
+        flag(dnc, "com.apple.screenIsLocked") { $0.screenLocked = true }
+        flag(dnc, "com.apple.screenIsUnlocked") { $0.screenLocked = false }
+        flag(dnc, "com.apple.screensaver.didstart") { $0.screenSaverRunning = true }
+        flag(dnc, "com.apple.screensaver.didstop") { $0.screenSaverRunning = false }
+        flag(nc, NSWorkspace.willSleepNotification.rawValue) { $0.systemAsleep = true }
+        flag(nc, NSWorkspace.didWakeNotification.rawValue) { $0.systemAsleep = false }
+        flag(nc, NSWorkspace.screensDidSleepNotification.rawValue) { $0.displaysAsleep = true }
+        flag(nc, NSWorkspace.screensDidWakeNotification.rawValue) { $0.displaysAsleep = false }
+
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
@@ -69,7 +95,8 @@ final class HidingEngine: ObservableObject {
     }
 
     private func didActivate(_ app: NSRunningApplication) {
-        guard app.processIdentifier != ownPID else { return }
+        // Ignore ourselves and system UI such as loginwindow on screen lock.
+        guard app.processIdentifier != ownPID, app.activationPolicy == .regular else { return }
         let now = Date()
         lastActive[app.processIdentifier] = now
         if let prev = currentApp, prev.processIdentifier != app.processIdentifier, !prev.isTerminated {
@@ -86,10 +113,34 @@ final class HidingEngine: ObservableObject {
         if app.hide() { store.config.totalHidden += 1 }
     }
 
+    private var isAway: Bool {
+        guard store.config.pauseWhileAway else { return false }
+        if screenLocked || screenSaverRunning || systemAsleep || displaysAsleep { return true }
+        let threshold = store.config.idleThreshold
+        guard threshold > 0 else { return false }
+        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState,
+                                                           eventType: CGEventType(rawValue: ~0)!)
+        return idle >= TimeInterval(threshold)
+    }
+
+    /// Freezes countdowns while away; on return, shifts every timestamp forward
+    /// by the time spent away so countdowns resume where they stopped.
+    private func updateAway(_ now: Date) {
+        if isAway {
+            if awaySince == nil { awaySince = now }
+        } else if let since = awaySince {
+            let shift = now.timeIntervalSince(since)
+            for (pid, date) in lastActive { lastActive[pid] = date.addingTimeInterval(shift) }
+            awaySince = nil
+        }
+    }
+
     func tick() {
-        let now = Date()
+        updateAway(Date())
+        // While away, the clock stands still at the moment we left.
+        let now = awaySince ?? Date()
         let profile = store.activeProfile
-        let paused = store.config.hidingPaused
+        let paused = store.config.hidingPaused || awaySince != nil
         let onScreen = Self.pidsWithOnScreenWindows()
         if let cur = currentApp, !cur.isTerminated { lastActive[cur.processIdentifier] = now }
 
