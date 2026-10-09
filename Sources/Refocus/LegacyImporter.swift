@@ -1,7 +1,7 @@
 import Foundation
 import SQLite3
 
-/// Reads the settings of the original Hocus Focus (UglyApps), which keeps its
+/// Reads the settings of the original Hocus Focus app, which keeps its
 /// profiles in a Core Data SQLite store and a few flags in its defaults domain.
 enum LegacyImporter {
     struct ImportError: LocalizedError {
