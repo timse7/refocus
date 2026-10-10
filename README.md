@@ -33,3 +33,7 @@ Requires Xcode 16+ and macOS 14+. Quit Hocus Focus first so the two don't compet
 ## License
 
 MIT, see [LICENSE](LICENSE). Refocus is an independent project and is not affiliated with the developers of Hocus Focus.
+
+## Acknowledgment
+
+Vibe-coded with Claude Opus 5.5 Medium.
